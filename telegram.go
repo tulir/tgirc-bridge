@@ -17,8 +17,8 @@ package main
 
 import (
 	"fmt"
-	flag "github.com/ogier/pflag"
 	"github.com/tucnak/telebot"
+	"strconv"
 	"time"
 )
 
@@ -38,9 +38,6 @@ func (su SimpleUser) Destination() string {
 	return su.Sender
 }
 
-var telegramGroup = flag.StringP("group", "g", "", "")
-var telegramToken = flag.StringP("token", "t", "", "")
-
 var telegram *telebot.Bot
 
 var groupSU SimpleUser
@@ -54,7 +51,7 @@ func init() {
 func startTelegram() {
 	// Connect to Telegram
 	var err error
-	telegram, err = telebot.NewBot(*telegramToken)
+	telegram, err = telebot.NewBot(config.Telegram.Token)
 	if err != nil {
 		logf("[DEBUG] Error connecting to Telegram: %[1]s\n", err)
 		return
@@ -103,6 +100,17 @@ func telegramMessageData(message telebot.Message) telebot.Message {
 	return message
 }
 
+func telegramUsername(message telebot.Message) string {
+	if len(message.Sender.Username) > 0 {
+		return message.Sender.Username
+	} else if len(message.Sender.FirstName) > 0 {
+		return message.Sender.FirstName
+	} else if len(message.Sender.LastName) > 0 {
+		return message.Sender.LastName
+	}
+	return strconv.Itoa(message.Sender.ID)
+}
+
 func telegramMessage(message telebot.Message) {
 	message = telegramMessageData(message)
 	if len(message.Text) == 0 {
@@ -114,20 +122,20 @@ func telegramMessage(message telebot.Message) {
 		logf("FORWARD>%[1]d|%[2]d|%[3]s|%[4]d|%[5]s§%[6]d|%[7]s|%[8]d\n",
 			message.ID,
 			message.Time().Unix(),
-			message.Sender.Username,
+			telegramUsername(message),
 			message.Sender.ID,
 			message.Text,
 			message.OriginalUnixtime,
 			message.OriginalSender.Username,
 			message.OriginalSender.ID,
 		)
-		ircmessage(message.Sender.Username, fmt.Sprintf("[fwd from %[2]s] %[1]s", message.Text, message.OriginalSender.Username))
+		ircmessage(message.Chat.ID, telegramUsername(message), fmt.Sprintf("[fwd from %[2]s] %[1]s", message.Text, message.OriginalSender.Username))
 	} else if message.IsReply() {
 		// Type>ID|Timestamp|Username|UID|Text||ReplyID|ReplyTimestamp|ReplyUsername|ReplyUID|ReplyText
 		logf("REPLY>%[1]d|%[2]d|%[3]s|%[4]d|%[5]s§%[6]d|%[7]d|%[8]s|%[9]d|%[10]s\n",
 			message.ID,
 			message.Time().Unix(),
-			message.Sender.Username,
+			telegramUsername(message),
 			message.Sender.ID,
 			message.Text,
 			message.ReplyTo.ID,
@@ -136,17 +144,17 @@ func telegramMessage(message telebot.Message) {
 			message.ReplyTo.Sender.ID,
 			message.ReplyTo.Text,
 		)
-		ircmessage(message.Sender.Username, fmt.Sprintf("[reply to %[2]s] %[1]s", message.Text, message.ReplyTo.Sender.Username))
+		ircmessage(message.Chat.ID, telegramUsername(message), fmt.Sprintf("[reply to %[2]s] %[1]s", message.Text, message.ReplyTo.Sender.Username))
 	} else {
 		// Type>ID|Timestamp|Username|UID|Text
 		logf("MESSAGE>%[1]d|%[2]d|%[3]s|%[4]d|%[5]s\n",
 			message.ID,
 			message.Time().Unix(),
-			message.Sender.Username,
+			telegramUsername(message),
 			message.Sender.ID,
 			message.Text,
 		)
-		ircmessage(message.Sender.Username, message.Text)
+		ircmessage(message.Chat.ID, telegramUsername(message), message.Text)
 	}
 }
 
@@ -167,7 +175,7 @@ func telegramLog(message telebot.Message) {
 			message.UserJoined.Username,
 			message.UserJoined.ID,
 		)
-		ircmessage(message.Sender.Username, "* joined the group")
+		ircmessage(message.Chat.ID, telegramUsername(message), "* joined the group")
 		return
 	} else if message.UserLeft.ID != 0 {
 		// Type>ID|Timestamp|Username|UID
@@ -177,7 +185,7 @@ func telegramLog(message telebot.Message) {
 			message.UserJoined.Username,
 			message.UserJoined.ID,
 		)
-		ircmessage(message.Sender.Username, "* left the group")
+		ircmessage(message.Chat.ID, telegramUsername(message), "* left the group")
 		return
 	} else if len(message.NewChatTitle) > 0 {
 		message.Text = "Group title changed to " + message.NewChatTitle
@@ -190,7 +198,7 @@ func telegramLog(message telebot.Message) {
 	logf("DATA>%[1]d|%[2]d|%[3]s|%[4]d|%[5]s\n",
 		message.ID,
 		message.Time().Unix(),
-		message.Sender.Username,
+		telegramUsername(message),
 		message.Sender.ID,
 		message.Text,
 	)

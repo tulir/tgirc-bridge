@@ -59,7 +59,7 @@ type File struct {
 
 // Download downloads the given file
 func Download(name string) []byte {
-	resp, err := http.DefaultClient.Get(fmt.Sprintf(DownloadFile, *telegramToken, name))
+	resp, err := http.DefaultClient.Get(fmt.Sprintf(DownloadFile, config.Telegram.Token, name))
 	if err != nil {
 		return []byte{}
 	}
@@ -74,7 +74,7 @@ func Download(name string) []byte {
 
 // CreateDownload calls the getFile method in the Telegram API
 func CreateDownload(id string) string {
-	resp, err := http.DefaultClient.Get(fmt.Sprintf(GetFile, *telegramToken, id))
+	resp, err := http.DefaultClient.Get(fmt.Sprintf(GetFile, config.Telegram.Token, id))
 	if err != nil {
 		return ""
 	}

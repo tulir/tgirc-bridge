@@ -17,64 +17,63 @@ package main
 
 import (
 	"fmt"
-	flag "github.com/ogier/pflag"
 	goirc "github.com/thoj/go-ircevent"
+	"strconv"
 	"strings"
 	"time"
 )
 
-var ircChannel = flag.StringP("channel", "c", "#telegram", "")
-var ircAddr = flag.StringP("address", "a", "", "")
-var ircName = flag.StringP("username", "u", "logbot", "")
-var ircPassword = flag.StringP("password", "p", "", "")
-var ircNick = flag.StringP("nick", "n", "tgbridge", "")
+// Telegram message format when receiving from IRC
+const (
+	IRCMsgFormat    = "*<%[1]s>* %[2]s"
+	IRCActionFormat = "*★ %[1]s* %[2]s"
+)
 
 var irc *goirc.Connection
 
 func startIRC() {
 	quit := make(chan bool)
-	irc = goirc.IRC(*ircNick, *ircName)
-	irc.UseTLS = true
+	irc = goirc.IRC(config.IRC.Nick, config.IRC.User)
+	irc.UseTLS = config.IRC.TLS
 	irc.QuitMessage = "Bridge/logbot shutting down..."
 	irc.Version = version
-	err := irc.Connect(*ircAddr)
+	err := irc.Connect(config.IRC.Address)
 	if err != nil {
 		logf(err.Error())
 	}
-	irc.AddCallback("PRIVMSG", func(event *goirc.Event) {
-		if event.Arguments[0] == *ircChannel {
-			telegram.SendMessage(groupSU, fmt.Sprintf("*<%[1]s>* %[2]s", event.Nick, filterMarkdown(event.Message())), md)
-			// Type>Timestamp|Username|Text
-			logf("IRCMESSAGE>%[1]d|%[2]s|%[3]s\n",
-				time.Now().Unix(),
-				event.Nick,
-				event.Message(),
-			)
-		} else {
-			logf("UIRCMESSAGE>%[1]d|%[2]s|%[3]s\n",
-				time.Now().Unix(),
-				event.Nick,
-				event.Message(),
-			)
+
+	callback := func(channel, nick, message, command string) {
+		tgChan, ok := config.GetTelegramChannel(channel)
+		if !ok {
+			logf("Unidentified IRC channel: %s\n", channel)
+			return
 		}
+
+		logFmt := "IRCMESSAGE"
+		if command == "message" {
+			telegram.SendMessage(tgChan, fmt.Sprintf(IRCMsgFormat, nick, decodeIRC(message)), md)
+		} else if command == "action" {
+			telegram.SendMessage(tgChan, fmt.Sprintf(IRCActionFormat, nick, decodeIRC(message)), md)
+			logFmt = "IRCACTION"
+		}
+
+		logf("%[4]s>%[1]d|%[2]s|%[3]s\n", time.Now().Unix(), nick, message, logFmt)
+	}
+
+	irc.AddCallback("PRIVMSG", func(event *goirc.Event) {
+		callback(event.Arguments[0], event.Nick, event.Message(), "message")
 	})
 
 	irc.AddCallback("CTCP_ACTION", func(event *goirc.Event) {
-		if event.Arguments[0] == *ircChannel {
-			telegram.SendMessage(groupSU, fmt.Sprintf("*★ %[1]s* %[2]s", event.Nick, filterMarkdown(event.Message())), md)
-			// Type>Timestamp|Username|Text
-			logf("IRCACTION>%[1]d|%[2]s|%[3]s\n",
-				time.Now().Unix(),
-				event.Nick,
-				event.Message(),
-			)
-		}
+		callback(event.Arguments[0], event.Nick, event.Message(), "action")
 	})
 
 	irc.AddCallback("001", func(event *goirc.Event) {
-		irc.Join(*ircChannel)
-		if len(*ircPassword) > 0 {
-			irc.Privmsgf("NickServ", "IDENTIFY %s", *ircPassword)
+		for key := range config.Mappings {
+			irc.Join(key)
+		}
+		if len(config.IRC.Password) > 0 {
+			irc.Privmsgf("NickServ", "IDENTIFY %s", config.IRC.Password)
 		}
 		logf("[DEBUG] Successfully connected to IRC!\n")
 	})
@@ -87,13 +86,23 @@ func startIRC() {
 	<-quit
 }
 
-func filterMarkdown(msg string) string {
-	return strings.Replace(strings.Replace(msg, "*", "\\*", -1), "_", "\\_", -1)
+func decodeIRC(msg string) string {
+	msg = strings.Replace(msg, "*", "\\*", -1)
+	msg = strings.Replace(msg, "_", "\\_", -1)
+	msg = strings.Replace(msg, "\x02", "*", -1)
+	msg = strings.Replace(msg, "\x1D", "_", -1)
+	return msg
 }
 
-func ircmessage(user, msg string) {
+func ircmessage(ch int64, user, msg string) {
+	channel, ok := config.GetIRCChannel(strconv.FormatInt(ch, 10))
+	if !ok {
+		logf("Unidentified Telegram group: %d\n", ch)
+		return
+	}
+
 	for _, line := range Split(msg) {
-		irc.Privmsgf(*ircChannel, "<%s> %s", user, line)
+		irc.Privmsgf(channel, "<%s> %s", user, line)
 	}
 }
 

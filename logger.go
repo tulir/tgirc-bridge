@@ -18,12 +18,9 @@ package main
 import (
 	"bufio"
 	"fmt"
-	flag "github.com/ogier/pflag"
 	"os"
 	"time"
 )
-
-var terminalOutput = flag.BoolP("stdout", "o", false, "")
 
 var day int
 var log chan []byte
@@ -71,9 +68,9 @@ func ioLoop(file *os.File, writer *bufio.Writer) {
 				go open()
 				return
 			}
-			if *terminalOutput {
-				os.Stdout.Write(msg)
-			}
+
+			os.Stdout.Write(msg)
+
 			// Write it to the log file.
 			_, err := writer.Write(msg)
 			if err != nil {
