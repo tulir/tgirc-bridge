@@ -17,10 +17,11 @@ package main
 
 import (
 	"fmt"
-	goirc "github.com/thoj/go-ircevent"
 	"strconv"
 	"strings"
 	"time"
+
+	goirc "github.com/thoj/go-ircevent"
 )
 
 // Telegram message format when receiving from IRC

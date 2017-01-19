@@ -17,9 +17,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/tucnak/telebot"
 	"strconv"
 	"time"
+
+	"github.com/tucnak/telebot"
 )
 
 // GoogleMaps ...
@@ -86,7 +87,7 @@ func misUpload(text, fileID string) string {
 }
 
 func telegramMessageData(message telebot.Message) telebot.Message {
-	if len(message.Photo) > 0 && *useMis {
+	if len(message.Photo) > 0 && len(config.MIS.Username) > 0 {
 		message.Text = misUpload(message.Text, message.Photo[len(message.Photo)-1].FileID)
 	} else if message.Sticker.Exists() {
 		message.Text = misUpload(message.Text, message.Sticker.FileID)

@@ -20,8 +20,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	flag "github.com/ogier/pflag"
-	_ "golang.org/x/image/webp"
 	"image"
 	_ "image"
 	_ "image/gif"
@@ -31,6 +29,8 @@ import (
 	"math/rand"
 	"net/http"
 	"time"
+
+	_ "golang.org/x/image/webp"
 )
 
 // Telegram API constants
@@ -38,11 +38,6 @@ const (
 	GetFile      = "https://api.telegram.org/bot%s/getFile?file_id=%s"
 	DownloadFile = "https://api.telegram.org/file/bot%s/%s"
 )
-
-var useMis = flag.BoolP("use-mis", "m", false, "Use mauImageServer to transfer Telegram images to IRC.")
-var misAddress = flag.String("mis-address", "", "mauImageServer address")
-var misName = flag.String("mis-user", "", "mauImageServer username")
-var misPassword = flag.String("mis-password", "", "mauImageServer password")
 
 // Result ...
 type Result struct {
@@ -121,8 +116,8 @@ func MISUpload(data []byte) string {
 		Name:      ImageName(5),
 		Format:    "jpg",
 		Client:    version,
-		Username:  *misName,
-		AuthToken: *misPassword,
+		Username:  config.MIS.Username,
+		AuthToken: config.MIS.Password,
 		Hidden:    true,
 	}
 
@@ -131,7 +126,7 @@ func MISUpload(data []byte) string {
 		return ""
 	}
 
-	resp, err := http.DefaultClient.Post(fmt.Sprintf("%s/%s", *misAddress, "insert"), "text/json", bytes.NewReader(data))
+	resp, err := http.DefaultClient.Post(fmt.Sprintf("%s/%s", config.MIS.Address, "insert"), "text/json", bytes.NewReader(data))
 	if err != nil {
 		return ""
 	}
@@ -141,7 +136,7 @@ func MISUpload(data []byte) string {
 	dec.Decode(&r)
 
 	if r.Success {
-		return fmt.Sprintf("%s/%s.jpg", *misAddress, dat.Name)
+		return fmt.Sprintf("%s/%s.jpg", config.MIS.Address, dat.Name)
 	}
 	return ""
 }
