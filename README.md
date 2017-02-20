@@ -2,3 +2,6 @@
 A fairly simple program to bridge a specific group on Telegram and a specific channel on IRC.
 
 Use `go get maunium.net/go/tgirc-bridge` to download and compile
+
+## No longer maintained
+I've stopped using IRC in favor of [Matrix](https://matrix.org).
